@@ -3,7 +3,7 @@ from collections import defaultdict as ddict
 
 import sys
 
-from anytree import Node, RenderTree, PreOrderIter
+#from anytree import Node, RenderTree, PreOrderIter
 
 indata = """pbga (66)
 xhth (57)
@@ -18,6 +18,11 @@ jptl (61)
 ugml (68) -> gyxo, ebii, jptl
 gyxo (61)
 cntj (57)"""
+
+# Total weight;
+# ugml (183) + 68 = 251
+# padx (66+66+66=192) + 45 = 243
+# fwft (57+57+57) + 72 = 243
 
 indata = """suvtxzq (242) -> tdoxrnb, oanxgk
 smjsfux (7)
@@ -1118,7 +1123,127 @@ urxki (409)
 iygpmov (46) -> jprrnd, wojfh, vhrxv, yeogm
 lfkqyf (237)"""
 
+data = indata.split('\n')
+
+# Create own Node class or buy beer on bolag
+class Node():
+    def __init__(self,name,weight):
+        self.name=name
+        self.weight = int(weight)
+        self.children = []
+        self.totalWeight = -1
+        self.parent = None
+
+    def getName(self):
+        return self.name
+
+    def getWeight (self):
+        return self.weight
+
+    def addChildren(self,childList):
+        for child in childList:
+            self.children.append(child)
+            child.setParent(self)
+
+    def setParent(self,parent):
+        self.parent=parent
+
+    def getTotalWeight (self):
+        if(self.totalWeight>0):
+            return self.weight + self.totalWeight
+        else:
+            self.totalWeight = 0
+            for child in self.children:
+                self.totalWeight = self.totalWeight + int(child.getTotalWeight())
+            return self.totalWeight+self.weight
+
+    def findLeaf(self):
+        if (len(self.children)==0):
+            return [self]
+        else:
+            leafList = []
+            for child in self.children:
+                leafList = leafList + child.findLeaf()
+            return leafList
+
+    def getRoot(self):
+        if(self.parent==None):
+            return self
+        else:
+            return self.parent.getRoot()
+
+    def findUnbalancedNode(self,level):
+        if(len(self.children)>0):
+            if (len(self.children)==2):
+                return self.parent.findUnbalancedNode(level+1)
+
+            w = self.children[0].getTotalWeight()
+            for i in range(1,len(self.children)):
+                if (self.children[i].getTotalWeight()!=w):
+                    if (i>1 or self.children[i+1].getTotalWeight()!=w):
+                        diff = self.children[i].getTotalWeight()-w
+                        return self.children[0],diff,level
+                    else:
+                        diff = w-self.children[i].getTotalWeight()
+                        return self.children[i],diff,level
+
+        if (self.parent!=None):
+            return self.parent.findUnbalancedNode(level+1)
+        return None,0,-1
+
+# Convert indata to node objects
+nodeList = {}
+def processParent (rawNode):
+    name = rawNode.split(' ')[0]
+    weight = rawNode.split(' ')[1]
+    weight = weight[1:]
+    weight = weight[:-1]
+    return name,weight
+
+for e in data:
+    row = e.split(' -> ')
+    name,weight = processParent(row[0])
+    node = Node(name,weight)
+    nodeList[node.getName()]=node
+
+for e in data:
+    row = e.split(' -> ')
+    parentName,_ = processParent(row[0])
+
+    if (len(row)>1):
+        rawNode = row[1]
+
+        childNames = rawNode.split(', ')
+        parentNode = nodeList[parentName]
+        for childName in childNames:
+            parentNode.addChildren([nodeList[childName]])
+
+# Find  all leafs leafs
+nodes = []
+for key in nodeList.keys():
+    nodes.append(nodeList[key])
+
+rootNode = nodes[0].getRoot()
+leafList = rootNode.findLeaf()
+
+# Find diff
+minLevel = 100
+minDiff = 0
+diffNode = None
+for leaf in leafList:
+    node,diff,level = leaf.findUnbalancedNode(0)
+    if (node!=None and level<minLevel):
+        minDiff = diff
+        diffNode = node
+        minLevel = level
+
+# Correct answear prints here
+print(diffNode.getName(), diffNode.getWeight(), minDiff)
+
+# Dont go beyond this point, much confusing
+exit()
 topLevelTuple = [(i.split(' (')[0], i.split(' (')[1]) for i in indata.split('\n')]
+
 
 namesWeightsRelations = {}
 
@@ -1153,5 +1278,3 @@ for i in range(4):
         total += namesWeightsRelations[myLeg][0]
 
     print(total, myLegs[0])
-
-
